@@ -1,50 +1,38 @@
 from pathlib import Path
-
+import torch
 from anomalib.data import MVTecAD
 from anomalib.models import Patchcore
 from anomalib.engine import Engine
 
 CHECKPOINT = Path("models/CastTraceAI_model.ckpt")
 
-def predict(image_path: str):
-"""Run PatchCore inference using the trained checkpoint."""
-if not CHECKPOINT.exists():
-raise FileNotFoundError(
-f"Checkpoint not found at {CHECKPOINT.resolve()}. "
-"Download CastTraceAI_model.ckpt and place it in the models folder."
-)
 
-```
-# The model was trained using MVTec AD's metal_nut category.
-datamodule = MVTecAD(
-    root="./datasets",
-    category="metal_nut",
-    train_batch_size=1,
-    eval_batch_size=1,
-)
+def predict_dataset(dataset_root="./datasets"):
+    """Evaluate the metal_nut test dataset."""
+    if not CHECKPOINT.exists():
+        raise FileNotFoundError(
+            f"Checkpoint not found: {CHECKPOINT.resolve()}"
+        )
 
-model = Patchcore()
-engine = Engine(accelerator="auto", devices=1)
+    datamodule = MVTecAD(
+        root=dataset_root,
+        category="metal_nut",
+        train_batch_size=8,
+        eval_batch_size=8,
+    )
 
-# This is the test/prediction pipeline; exact support for arbitrary
-# single-image inputs must be verified against the training configuration.
-results = engine.predict(
-    model=model,
-    datamodule=datamodule,
-    ckpt_path=str(CHECKPOINT),
-)
+    model = Patchcore()
+    engine = Engine(
+        accelerator="gpu" if torch.cuda.is_available() else "cpu",
+        devices=1,
+    )
 
-return results
-```
+    return engine.test(
+        model=model,
+        datamodule=datamodule,
+        ckpt_path=str(CHECKPOINT),
+    )
 
-if **name** == "**main**":
-import argparse
 
-```
-parser = argparse.ArgumentParser()
-parser.add_argument("--image", required=True, help="Image to evaluate")
-args = parser.parse_args()
-
-predictions = predict(args.image)
-print(predictions)
-```
+if __name__ == "__main__":
+    print(predict_dataset())
